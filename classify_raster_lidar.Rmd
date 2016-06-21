@@ -1,0 +1,132 @@
+---
+title: "Classify raster lidar data"
+author: "Sarah Graves"
+date: "June 21, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Import libraries
+
+`require` vs. `library`
+
+
+```{r IMPORT-LIBRARIES, message = F, warning = F}
+
+library(raster)
+library(rgdal)
+
+```
+
+# Load CHM
+
+```{r IMPORT-CHM}
+
+# import and view
+chm <- raster("../NEONdata/D17-California/TEAK/2013/lidar/TEAK_lidarCHM.tif")
+plot(chm,
+     main="2013 canopy height model for D17 TEAK")
+
+```
+
+# Deal with 0 values
+
+```{r ASSIGN-NA-VALS}
+
+# examine data distribution to check for zeros
+hist(chm)
+
+# assign NA to zero values to remove these values from further calculations
+chm[chm==0] <- NA
+
+hist(chm,
+     main="CHM distribution after zero removal")
+
+```
+
+# Import aspect data
+
+```{r IMPORT-ASPECT}
+
+aspect <- raster("../NEONdata/D17-California/TEAK/2013/lidar/TEAK_lidarAspect.tif")
+plot(aspect,
+     main="2013 aspect for D17 TEAK")
+```
+
+# Classify aspect
+
+North facing slopes (*class 1*) are those with an aspect of 0-45 degrees and 315-360 degrees
+South facing slopes (*class 2*) are those with an aspect of 135-225 degrees
+All other aspects will not be considered.
+
+```{r CLASS-MATRIX}
+
+# create an array with aspect ranges and classes
+# this will be converted into a matrix
+class.m <- c(0,45,1,
+             45,135,NA,
+             135,225,2,
+             225,315,NA,
+             315,360,1)
+
+# this is a reclass matrix that will be used to reclassify the aspect raster
+rcl.m <- matrix(class.m,
+                  ncol = 3,
+                  byrow = T)
+
+```
+
+```{r RECLASS-RASTER}
+
+# reclassify the aspect raster
+asp.ns <- reclassify(aspect,
+                     rcl.m)
+
+plot(asp.ns,
+     main="North and South facing slopes")
+```
+
+
+# Save reclassified aspect raster
+
+```{r EXPORT-TIF,eval=FALSE}
+
+# export raster, use compression, and set NA value
+writeRaster(asp.ns,"../outputs/TEAK/TEAK_nsAspect2.tif",
+             options="COMPRESS=LZW",
+             NAflag = -9999)
+
+```
+
+
+# Mask data
+
+Use NDVI data to create a mask. 
+
+```{r IMPORT-NDVI}
+
+ndvi <- raster("../NEONdata/D17-California/TEAK/2013/spectrometer/veg_index/TEAK_NDVI.tif")
+plot(ndvi,
+     main="2013 NDVI for D17 TEAK")
+
+```
+
+
+
+```{r RASTER-MASK}
+
+# mask data
+nsFacing.ndvi <- mask(ndvi,asp.ns)
+plot(nsFacing.ndvi,
+     main="NDVI for north and south facing slopes")
+```
+
+
+
+
+
+
+
